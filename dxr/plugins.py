@@ -101,6 +101,9 @@ class Schema:
     """ Returns the SQL that creates the tables in this schema. """
     return '\n'.join([tbl.get_create_sql() for tbl in self.tables.itervalues()])
 
+  def get_insert_sql(self, tblname, args):
+    return self.tables[tblname].get_insert_sql(args)
+
   def get_data_sql(self, blob):
     """ Returns the SQL that inserts data into tables given a blob. """
     for tbl in self.tables:
@@ -138,6 +141,7 @@ class SchemaTable:
   def __init__(self, tblname, tblschema):
     self.name = tblname
     self.key = None
+    self.index = None
     self.columns = []
     self.needLang = False
     defaults = ['VARCHAR(256)', True]
@@ -150,6 +154,8 @@ class SchemaTable:
         spec = (spec,)
       if col == '_key':
         self.key = spec
+      elif col == '_index':
+        self.index = spec
       elif col[0] != '_':
         # if spec is deficient, we need to full it in with default tuples
         values = list(spec)
@@ -178,6 +184,8 @@ class SchemaTable:
       colstrs.append('PRIMARY KEY (%s)' % ', '.join(self.key))
     sql += ',\n  '.join(colstrs)
     sql += '\n);\n'
+    if self.index is not None:
+      sql += 'CREATE UNIQUE INDEX %s_index on %s (%s);' % (self.name, self.name, ','.join(self.index))
     return sql
 
   def get_data_sql(self, blobtbl):
@@ -190,6 +198,22 @@ class SchemaTable:
       yield ('INSERT OR IGNORE INTO %s (%s) VALUES (%s);' % (self.name,
         ','.join(keys), ','.join('?' for k in keys)), args)
 
+  def get_insert_sql(self, args):
+    colset = set(col[0] for col in self.columns)
+    unwanted = []
+
+    # Only add the keys in the columns
+    for key in args.iterkeys():
+      if key not in colset:
+        unwanted.append(key)
+
+    for key in unwanted:
+      del args[key]
+
+    return ('INSERT OR IGNORE INTO %s (%s) VALUES (%s)' %
+            (self.name, ','.join(args.keys()), ','.join('?' for k in range(0, len(args)))),
+            args.values())
+
 def make_get_schema_func(schema):
   """ Returns a function that satisfies get_schema's contract from the given
       schema object. """
@@ -200,7 +224,7 @@ def make_get_schema_func(schema):
 
 def required_exports():
   """ Returns the required exports for a module, for use as __all__. """
-  return ['post_process', 'sqlify', 'can_use', 'get_htmlifiers', 'get_schema',
+  return ['post_process', 'build_database', 'sqlify', 'can_use', 'get_htmlifiers', 'get_schema',
     'pre_html_process']
 
 last_id = 0
