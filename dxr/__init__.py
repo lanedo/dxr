@@ -101,6 +101,14 @@ class DxrConfig(object):
 
     self.wwwdir = os.path.abspath(config.get('Web', 'wwwdir'))
     self.virtroot = os.path.abspath(config.get('Web', 'virtroot'))
+    if config.has_option('Web', 'big_logo'):
+        self.big_logo = os.path.abspath(config.get('Web', 'big_logo'))
+    else:
+        self.big_logo = "/images/powered-by-mozilla.png"
+    if config.has_option('Web','small_logo'):
+        self.small_logo = os.path.abspath(config.get('Web', 'small_logo'))
+    else:
+        self.small_logo = "/images/powered-by-mozilla-small.png"
     if self.virtroot.endswith('/'):
       self.virtroot = self.virtroot[:-1]
     self.hosturl = config.get('Web', 'hosturl')
